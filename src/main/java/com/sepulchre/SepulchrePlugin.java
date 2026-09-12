@@ -612,7 +612,7 @@ public class SepulchrePlugin extends Plugin
 			return;
 		}
 
-		MenuEntry[] entries = client.getMenuEntries();
+		MenuEntry[] entries = client.getMenu().getMenuEntries();
 		if (entries.length < 2)
 		{
 			return;
@@ -635,7 +635,7 @@ public class SepulchrePlugin extends Plugin
 			MenuEntry temp = entries[quickExitIndex];
 			entries[quickExitIndex] = entries[activateIndex];
 			entries[activateIndex] = temp;
-			client.setMenuEntries(entries);
+			client.getMenu().setMenuEntries(entries);
 		}
 	}
 

@@ -112,7 +112,8 @@ public class ProjectileTracker
 	{
 		activeLightning.removeIf(LightningStrike::isExpired);
 
-		activePortalGraphics.entrySet().removeIf(entry -> {
+		activePortalGraphics.entrySet().removeIf(entry ->
+		{
 			int remaining = entry.getValue() - 1;
 			if (remaining <= 0)
 			{
@@ -125,7 +126,8 @@ public class ProjectileTracker
 			return false;
 		});
 
-		pendingLightning.entrySet().removeIf(entry -> {
+		pendingLightning.entrySet().removeIf(entry ->
+		{
 			int remaining = entry.getValue() - 1;
 			if (remaining <= 0)
 			{

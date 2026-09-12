@@ -157,7 +157,7 @@ public class WizardCyclePhaseTracker
 		}
 
 		boolean skipFiring = (southSkip != null && southSkip.isFiring())
-		                  || (northSkip != null && northSkip.isFiring());
+			|| (northSkip != null && northSkip.isFiring());
 		boolean southRowFiring = southFiringCount > 0;
 		boolean northRowFiring = northFiringCount > 0;
 

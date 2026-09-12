@@ -9,7 +9,6 @@ import net.runelite.api.Player;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.components.LineComponent;
 
 import javax.inject.Inject;
@@ -87,7 +86,7 @@ public class InfoPanelOverlay extends OverlayPanel
 
 		setPosition(OverlayPosition.TOP_LEFT);
 		setLayer(OverlayLayer.ABOVE_WIDGETS);
-		setPriority(OverlayPriority.LOW);
+		setPriority(PRIORITY_LOW);
 	}
 
 	@Override

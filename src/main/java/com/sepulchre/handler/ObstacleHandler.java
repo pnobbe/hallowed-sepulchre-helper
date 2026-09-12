@@ -344,7 +344,7 @@ public class ObstacleHandler
 
 	public void scanForExistingGroundObjects()
 	{
-		net.runelite.api.Scene scene = client.getScene();
+		net.runelite.api.Scene scene = client.getTopLevelWorldView().getScene();
 		net.runelite.api.Tile[][][] tiles = scene.getTiles();
 
 		for (int z = 0; z < tiles.length; z++)

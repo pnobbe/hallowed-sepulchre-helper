@@ -28,7 +28,6 @@ import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.OverlayUtil;
 
 import javax.inject.Inject;
@@ -87,7 +86,7 @@ public class SepulchreSceneOverlay extends Overlay
 
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
-		setPriority(OverlayPriority.LOW);
+		setPriority(PRIORITY_LOW);
 	}
 
 	@Override
@@ -98,7 +97,7 @@ public class SepulchreSceneOverlay extends Overlay
 			return null;
 		}
 
-		int playerPlane = client.getPlane();
+		int playerPlane = client.getTopLevelWorldView().getPlane();
 
 		renderLightning(graphics, playerPlane);
 		renderCrossbowStatues(graphics, playerPlane);
