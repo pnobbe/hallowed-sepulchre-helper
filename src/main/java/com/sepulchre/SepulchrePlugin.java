@@ -2,7 +2,9 @@ package com.sepulchre;
 
 import com.google.inject.Provides;
 import com.sepulchre.config.SepulchreConfig;
+import com.sepulchre.debug.SepulchreVarDumper;
 import com.sepulchre.handler.ObstacleHandler;
+import com.sepulchre.handler.SepulchreVarTracker;
 import com.sepulchre.model.SepulchreRoute;
 import com.sepulchre.overlay.InfoPanelOverlay;
 import com.sepulchre.overlay.RunTimerOverlay;
@@ -37,9 +39,12 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javax.inject.Inject;
 import java.util.Map;
 
+@Slf4j
 @PluginDescriptor(
 	name = "Hallowed Sepulchre Helper",
 	description = "Hallowed Sepulchre helper with more customization",
@@ -68,6 +73,10 @@ public class SepulchrePlugin extends Plugin
 	@Inject
 	private ObstacleHandler obstacleHandler;
 
+	private SepulchreVarDumper varDumper;
+
+	private SepulchreVarTracker varTracker;
+
 	@Inject
 	private ClientThread clientThread;
 
@@ -92,6 +101,12 @@ public class SepulchrePlugin extends Plugin
 		overlayManager.add(infoPanelOverlay);
 		overlayManager.add(runTimerOverlay);
 		obstacleHandler.setOnSepulchreDetected(this::onSepulchreObjectDetected);
+		varTracker = new SepulchreVarTracker(client);
+		varDumper = new SepulchreVarDumper(client, obstacleHandler);
+		if (config.dumpVars())
+		{
+			varDumper.start();
+		}
 		reset();
 	}
 
@@ -101,6 +116,11 @@ public class SepulchrePlugin extends Plugin
 		overlayManager.remove(sceneOverlay);
 		overlayManager.remove(infoPanelOverlay);
 		overlayManager.remove(runTimerOverlay);
+		if (varDumper != null)
+		{
+			varDumper.stop();
+			varDumper = null;
+		}
 		reset();
 	}
 
@@ -115,6 +135,11 @@ public class SepulchrePlugin extends Plugin
 		verifiedThisTick = false;
 		pendingRouteClassification = false;
 		pendingRouteFloor = 0;
+		if (varTracker != null)
+		{
+			varTracker.reset();
+		}
+		obstacleHandler.resetThrownSwordHolds();
 		obstacleHandler.reset();
 	}
 
@@ -124,6 +149,21 @@ public class SepulchrePlugin extends Plugin
 		if (!"sepulchre".equals(event.getGroup()))
 		{
 			return;
+		}
+
+		// Cheap and rare; avoids having to enumerate every key that can affect route filtering.
+		obstacleHandler.invalidateRouteCache();
+
+		if (varDumper != null && "dumpVars".equals(event.getKey()))
+		{
+			if (config.dumpVars())
+			{
+				varDumper.start();
+			}
+			else
+			{
+				varDumper.stop();
+			}
 		}
 
 		String key = event.getKey();
@@ -191,12 +231,45 @@ public class SepulchrePlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick event)
 	{
+		// Sampled before the in-Sepulchre gate so lobby-to-floor transitions are captured too.
+		if (varDumper != null)
+		{
+			varDumper.onGameTick();
+		}
+
 		if (client.getGameState() != GameState.LOGGED_IN)
 		{
 			return;
 		}
 
 		ticksSinceLoggedIn++;
+
+		// Corroborates the chat-message triggers below with the game's own state. Both paths
+		// call the same idempotent handlers, so a duplicate signal is harmless and a missed
+		// chat message no longer loses the event.
+		if (inSepulchre)
+		{
+			sceneOverlay.reportThrowCountdownRendering(obstacleHandler.getThrowCountdowns().size());
+		}
+
+		if (varTracker != null && inSepulchre)
+		{
+			varTracker.onGameTick();
+
+			if (varTracker.isCoffinLooted())
+			{
+				obstacleHandler.onCoffinLooted();
+			}
+			if (varTracker.isBrazierSacrificed())
+			{
+				obstacleHandler.onBrazierSacrificed();
+			}
+			if (varTracker.isFloorBoundaryCrossed())
+			{
+				log.debug("Floor boundary crossed; plugin floor is {} route {}",
+					obstacleHandler.getCurrentFloor(), obstacleHandler.getCurrentRoute());
+			}
+		}
 
 		if (!inSepulchre && !earlyDetected)
 		{

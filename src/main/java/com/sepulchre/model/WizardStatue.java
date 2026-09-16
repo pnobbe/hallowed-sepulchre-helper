@@ -117,12 +117,58 @@ public class WizardStatue
 		ticksSinceSpawn++;
 	}
 
-	public String getDisplayTicks()
+	/**
+	 * How many ticks the fire phase actually lasts.
+	 * <p>
+	 * {@link #firePhaseTicks} is the first value displayed, not a duration: the counter is set to
+	 * it and then decrements to 0 inclusive, so the phase is one tick longer than the field
+	 * suggests. Adding the field rather than the duration leaves a one-tick stall at the
+	 * warning-to-fire handover.
+	 */
+	private int firePhaseDuration()
+	{
+		return firePhaseTicks + 1;
+	}
+
+	/**
+	 * Ticks until this pillar is safe to walk through, counted continuously across the warning
+	 * and fire phases. 0 is the final dangerous tick, matching the knight statues.
+	 * <p>
+	 * {@link #tickCounter} restarts at every animation change, so on its own it counts down to
+	 * the start of the fire phase rather than to the tile clearing - reaching 0 during the
+	 * warning means fire begins next tick, not that it is safe. Folding the fire phase's
+	 * duration into the warning phase gives a single countdown that always answers
+	 * "when can I run?".
+	 */
+	public int getTicksUntilSafe()
 	{
 		if (tickCounter < 0)
 		{
+			return -1;
+		}
+
+		// Once firing, the counter is already counting down to the tile clearing.
+		if (isFiring())
+		{
+			return tickCounter;
+		}
+
+		// firePhaseTicks varies by floor, so read it rather than assuming a fixed length.
+		if (isWarning())
+		{
+			return tickCounter + firePhaseDuration();
+		}
+
+		return tickCounter;
+	}
+
+	public String getDisplayTicks()
+	{
+		int ticksUntilSafe = getTicksUntilSafe();
+		if (ticksUntilSafe < 0)
+		{
 			return "?";
 		}
-		return String.valueOf(tickCounter);
+		return String.valueOf(ticksUntilSafe);
 	}
 }

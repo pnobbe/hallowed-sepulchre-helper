@@ -1,6 +1,7 @@
 package com.sepulchre.handler;
 
 import com.sepulchre.model.LightningStrike;
+import com.sepulchre.model.ThrownSwordTracker;
 import com.sepulchre.util.SepulchreConstants;
 import lombok.Getter;
 import net.runelite.api.Client;
@@ -26,6 +27,9 @@ public class ProjectileTracker
 	private final List<LightningStrike> activeLightning = new ArrayList<>();
 	private final Set<NPC> boltNpcs = new HashSet<>();
 	private final Set<NPC> swordNpcs = new HashSet<>();
+
+	@Getter
+	private final ThrownSwordTracker thrownSwordTracker;
 	private final Set<WorldPoint> activeYellowPortals = new HashSet<>();
 	private final Set<WorldPoint> activeBluePortals = new HashSet<>();
 	private final Map<WorldPoint, Integer> activePortalGraphics = new HashMap<>();
@@ -41,6 +45,7 @@ public class ProjectileTracker
 
 	public ProjectileTracker(Client client)
 	{
+		this.thrownSwordTracker = new ThrownSwordTracker(client);
 		this.client = client;
 	}
 
@@ -110,6 +115,8 @@ public class ProjectileTracker
 
 	public void onGameTick()
 	{
+		thrownSwordTracker.onGameTick(swordNpcs);
+
 		activeLightning.removeIf(LightningStrike::isExpired);
 
 		activePortalGraphics.entrySet().removeIf(entry ->

@@ -38,8 +38,10 @@ import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Shape;
 import java.awt.Stroke;
+import java.util.Map;
 import java.util.Set;
 
+@lombok.extern.slf4j.Slf4j
 public class SepulchreSceneOverlay extends Overlay
 {
 	private static final Stroke DEFAULT_STROKE = new BasicStroke(1);
@@ -105,6 +107,8 @@ public class SepulchreSceneOverlay extends Overlay
 		renderSwordStatues(graphics, playerPlane);
 		renderBoltNpcs(graphics, playerPlane);
 		renderSwordNpcs(graphics, playerPlane);
+		renderSwordThrowCountdowns(graphics, playerPlane);
+		renderSwordStatueNames(graphics, playerPlane);
 		renderPortals(graphics, playerPlane);
 		renderMagicalObelisks(graphics, playerPlane);
 		renderCoffins(graphics, playerPlane);
@@ -339,6 +343,8 @@ public class SepulchreSceneOverlay extends Overlay
 		}
 
 		Stroke dangerStroke = getDangerBorderStroke();
+		Color dangerColor = config.dangerColor();
+		Color warningColor = config.warningColor();
 
 		for (WizardStatue statue : obstacleHandler.getWizardStatues())
 		{
@@ -364,7 +370,7 @@ public class SepulchreSceneOverlay extends Overlay
 			}
 
 			boolean isFiring = statue.isFiring();
-			Color color = isFiring ? config.dangerColor() : config.warningColor();
+			Color color = isFiring ? dangerColor : warningColor;
 
 			if (showTickCounter)
 			{
@@ -399,18 +405,53 @@ public class SepulchreSceneOverlay extends Overlay
 		}
 	}
 
-	private void renderSwordStatues(Graphics2D graphics, int playerPlane)
+	/**
+	 * Draws a single number over a knight statue's danger zone, in the same place as the swing
+	 * countdown so the two read as one indicator changing meaning rather than two indicators.
+	 */
+	private void renderSwordStatueCounter(Graphics2D graphics, SwordStatue statue, String text, Color color)
 	{
-		boolean showTickCounter = config.knightTickCounter();
-		boolean showDanger = config.showDanger();
-		boolean showWarning = config.showWarning();
-
-		if (!showTickCounter && !showDanger && !showWarning)
+		if (text == null)
 		{
 			return;
 		}
 
+		WorldPoint center = statue.getDangerZoneCenter();
+		if (center == null)
+		{
+			return;
+		}
+
+		LocalPoint local = LocalPoint.fromWorld(client, center);
+		if (local == null)
+		{
+			return;
+		}
+
+		Point textLocation = Perspective.getCanvasTextLocation(client, graphics, local, text, 0);
+		if (textLocation != null)
+		{
+			OverlayUtil.renderTextLocation(graphics, textLocation, text, toOpaque(color));
+		}
+	}
+
+	private void renderSwordStatues(Graphics2D graphics, int playerPlane)
+	{
+		boolean showTickCounter = config.knightTickCounter();
+		boolean showSafeWindow = config.knightSafeWindowCounter();
+		boolean showDanger = config.showDanger();
+		boolean showWarning = config.showWarning();
+
+		if (!showTickCounter && !showSafeWindow && !showDanger && !showWarning)
+		{
+			return;
+		}
+
+		Color safeWindowColor = config.knightSafeWindowColor();
+
 		Stroke dangerStroke = getDangerBorderStroke();
+		Color dangerColor = config.dangerColor();
+		Color warningColor = config.warningColor();
 
 		for (SwordStatue statue : obstacleHandler.getSwordStatues())
 		{
@@ -427,11 +468,17 @@ public class SepulchreSceneOverlay extends Overlay
 
 			if (!statue.isInDangerousState())
 			{
+				// Safe: no danger tiles, just how long the window lasts. Drawn in its own colour
+				// so it cannot be mistaken for the countdown to the swing.
+				if (showSafeWindow)
+				{
+					renderSwordStatueCounter(graphics, statue, statue.getSafeWindowDisplayTicks(), safeWindowColor);
+				}
 				continue;
 			}
 
 			boolean isImminent = statue.isInImminentDangerState();
-			Color fillColor = isImminent ? config.dangerColor() : config.warningColor();
+			Color fillColor = isImminent ? dangerColor : warningColor;
 			Color borderColor = getDangerBorderColor(fillColor);
 
 			WorldPoint dangerCenter = statue.getDangerZoneCenter();
@@ -507,6 +554,119 @@ public class SepulchreSceneOverlay extends Overlay
 		}
 	}
 
+	/**
+	 * Counts down the quiet gap on a launcher that has no sword in flight, so the wait between a
+	 * sword returning and the next being thrown is covered rather than blank.
+	 */
+	private boolean drewThrowCountdown;
+	private int sawThrowCountdown;
+	private String missedThrowCountdown;
+
+	/** Called once per tick so the per-frame render loop is not logged hundreds of times. */
+	public void reportThrowCountdownRendering(int pendingAtTick)
+	{
+		if (pendingAtTick > 0 || sawThrowCountdown > 0)
+		{
+			// pendingAtTick is read on the game tick, sawThrowCountdown during frame rendering.
+			// If they disagree, the state is fine and the overlay simply is not seeing it.
+			log.debug("Throw countdown: {} pending at tick, {} seen while rendering, drew={}, {}",
+				pendingAtTick, sawThrowCountdown, drewThrowCountdown,
+				missedThrowCountdown == null ? "no misses" : missedThrowCountdown);
+		}
+		sawThrowCountdown = 0;
+		drewThrowCountdown = false;
+		missedThrowCountdown = null;
+	}
+
+	/**
+	 * Labels each sword statue with its route name, so a statue on screen can be matched to the
+	 * entry in {@link com.sepulchre.util.SwordLauncherTimings}. Off by default; this is for
+	 * identifying statues, not for playing.
+	 */
+	private void renderSwordStatueNames(Graphics2D graphics, int playerPlane)
+	{
+		if (!config.showSwordLauncherNames())
+		{
+			return;
+		}
+
+		for (SwordStatue statue : obstacleHandler.getSwordStatues())
+		{
+			GameObject obj = statue.getGameObject();
+			if (obj.getWorldLocation().getPlane() != playerPlane)
+			{
+				continue;
+			}
+
+			LocalPoint lp = obj.getLocalLocation();
+			if (lp == null)
+			{
+				continue;
+			}
+
+			// The table is keyed canonically, so the instanced position has to be converted back.
+			WorldPoint canonical = WorldPoint.fromLocalInstance(client, lp);
+			if (canonical == null)
+			{
+				continue;
+			}
+
+			String name = com.sepulchre.util.SwordLauncherTimings.getName(canonical);
+			if (name == null)
+			{
+				name = "unnamed " + canonical.getX() + "," + canonical.getY() + "," + canonical.getPlane();
+			}
+
+			Point textLocation = Perspective.getCanvasTextLocation(client, graphics, lp, name, 60);
+			if (textLocation != null)
+			{
+				OverlayUtil.renderTextLocation(graphics, textLocation, name, Color.WHITE);
+			}
+		}
+	}
+
+	private void renderSwordThrowCountdowns(Graphics2D graphics, int playerPlane)
+	{
+		if (!config.swordReturnCounter())
+		{
+			return;
+		}
+
+		Map<WorldPoint, Integer> countdowns = obstacleHandler.getThrowCountdowns();
+		if (countdowns.isEmpty())
+		{
+			return;
+		}
+
+		sawThrowCountdown = countdowns.size();
+
+		Color color = toOpaque(config.swordBorderColor());
+
+		for (Map.Entry<WorldPoint, Integer> entry : countdowns.entrySet())
+		{
+			WorldPoint launcher = entry.getKey();
+			// No explicit plane test: LocalPoint.fromWorld already returns null when the tile is
+			// on another plane or outside the scene, and doing it twice only dropped countdowns.
+			LocalPoint lp = LocalPoint.fromWorld(client, launcher);
+			if (lp == null)
+			{
+				continue;
+			}
+
+			String text = String.valueOf(entry.getValue());
+			Point textLocation = Perspective.getCanvasTextLocation(client, graphics, lp, text, 0);
+			if (textLocation != null)
+			{
+				OverlayUtil.renderTextLocation(graphics, textLocation, text, color);
+				drewThrowCountdown = true;
+			}
+			else
+			{
+				missedThrowCountdown = "offscreen " + launcher.getX() + "," + launcher.getY();
+			}
+		}
+	}
+
 	private void renderSwordNpcs(Graphics2D graphics, int playerPlane)
 	{
 		if (!config.highlightProjectiles())
@@ -519,6 +679,7 @@ public class SepulchreSceneOverlay extends Overlay
 		Stroke stroke = getProjectileBorderStroke();
 
 		boolean routeFilterEnabled = config.filterByRoute();
+		boolean showReturnCounter = config.swordReturnCounter();
 
 		for (NPC npc : obstacleHandler.getSwordNpcs())
 		{
@@ -552,6 +713,24 @@ public class SepulchreSceneOverlay extends Overlay
 			if (poly != null)
 			{
 				renderTilePolygon(graphics, poly, fillColor, borderColor, stroke);
+			}
+
+			// Only meaningful while the sword is holding at the end of its throw; -1 the rest
+			// of the time, and until this launcher's hold length has been seen once.
+			if (showReturnCounter)
+			{
+				int ticksUntilReturn = obstacleHandler.getTicksUntilSwordReturns(npc);
+				if (ticksUntilReturn >= 0)
+				{
+					String text = String.valueOf(ticksUntilReturn);
+					// Border colour, not fill: the fill is drawn under the text on the same tile,
+					// so using it would put dark text on the same dark shade.
+					Point textLocation = Perspective.getCanvasTextLocation(client, graphics, lp, text, 0);
+					if (textLocation != null)
+					{
+						OverlayUtil.renderTextLocation(graphics, textLocation, text, toOpaque(borderColor));
+					}
+				}
 			}
 		}
 	}

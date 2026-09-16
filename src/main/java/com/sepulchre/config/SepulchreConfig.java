@@ -47,6 +47,14 @@ public interface SepulchreConfig extends Config
 	)
 	String PLAYER_SECTION = "player";
 
+	@ConfigSection(
+		name = "Developer",
+		description = "Diagnostic tools. Not needed for normal play.",
+		position = 5,
+		closedByDefault = true
+	)
+	String DEVELOPER_SECTION = "developer";
+
 	@ConfigItem(
 		keyName = "showInfoPanel",
 		name = "Show Info Panel",
@@ -105,6 +113,30 @@ public interface SepulchreConfig extends Config
 	default boolean wizardTickCounter()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "swordReturnCounter",
+		name = "Sword Return Counter",
+		description = "Show how many ticks a thrown sword stays still before it starts moving back",
+		section = OBSTACLE_SECTION,
+		position = 3
+	)
+	default boolean swordReturnCounter()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "knightSafeWindowCounter",
+		name = "Knight Safe Window Counter",
+		description = "Show how many ticks a knight statue stays safe before it starts moving again",
+		section = OBSTACLE_SECTION,
+		position = 2
+	)
+	default boolean knightSafeWindowCounter()
+	{
+		return false;
 	}
 
 	@ConfigItem(
@@ -427,6 +459,19 @@ public interface SepulchreConfig extends Config
 
 	@Alpha
 	@ConfigItem(
+		keyName = "knightSafeWindowColor",
+		name = "Knight Safe Window Color",
+		description = "Color of the countdown shown while a knight statue is safe",
+		section = COLOR_SECTION,
+		position = 8
+	)
+	default Color knightSafeWindowColor()
+	{
+		return new Color(0, 220, 120, 255);
+	}
+
+	@Alpha
+	@ConfigItem(
 		keyName = "swordFillColor",
 		name = "Sword Projectile Fill Color",
 		description = "",
@@ -668,6 +713,31 @@ public interface SepulchreConfig extends Config
 	default int playerImmunityFillOpacity()
 	{
 		return 100;
+	}
+
+	@ConfigItem(
+		keyName = "showSwordLauncherNames",
+		name = "Label sword statues",
+		description = "Draw each sword statue's route name (e.g. \"Floor 3 east sword 1\") beside it",
+		section = DEVELOPER_SECTION,
+		position = 1
+	)
+	default boolean showSwordLauncherNames()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "dumpVars",
+		name = "Dump Sepulchre vars",
+		description = "Writes every change to the game's own Sepulchre vars to "
+			+ "~/.runelite/sepulchre-vardump.tsv. Diagnostic only; leave off for normal play.",
+		section = DEVELOPER_SECTION,
+		position = 0
+	)
+	default boolean dumpVars()
+	{
+		return false;
 	}
 
 }

@@ -3,6 +3,7 @@ package com.sepulchre.overlay;
 import com.sepulchre.SepulchrePlugin;
 import com.sepulchre.config.SepulchreConfig;
 import com.sepulchre.handler.ObstacleHandler;
+import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
@@ -27,6 +28,7 @@ public class RunTimerOverlay extends OverlayPanel
 		this.obstacleHandler = obstacleHandler;
 
 		setPosition(OverlayPosition.TOP_LEFT);
+		setLayer(OverlayLayer.ABOVE_WIDGETS);
 		setPriority(PRIORITY_LOW);
 	}
 

@@ -6,6 +6,7 @@ import com.sepulchre.model.WizardCyclePhaseTracker;
 import com.sepulchre.model.LightningStrike;
 import com.sepulchre.model.SepulchreRoute;
 import com.sepulchre.model.SwordStatue;
+import com.sepulchre.model.SwordStatueTimings;
 import com.sepulchre.model.WizardStatue;
 import com.sepulchre.util.SepulchreConstants;
 import lombok.Getter;
@@ -54,6 +55,13 @@ public class ObstacleHandler
 
 	@Getter
 	private final List<SwordStatue> swordStatues = new ArrayList<>();
+
+	/**
+	 * Deliberately not cleared by {@link #reset()}: statues are rebuilt on every scene reload,
+	 * and their measured cycles must outlive them or they are never learnt.
+	 */
+	@Getter
+	private final SwordStatueTimings swordStatueTimings = new SwordStatueTimings();
 
 	@Getter
 	private final List<GameObject> magicalObelisks = new ArrayList<>();
@@ -109,6 +117,11 @@ public class ObstacleHandler
 		this.floorState.setOnLowerSectionEntered(this::scanForExistingGroundObjects);
 		this.projectileTracker = new ProjectileTracker(client);
 		this.skillObstacleManager = new SkillObstacleManager(client);
+	}
+
+	public void invalidateRouteCache()
+	{
+		floorState.invalidateRouteCache();
 	}
 
 	public boolean shouldShowForCurrentRoute(net.runelite.api.coords.LocalPoint localPoint)
@@ -204,6 +217,27 @@ public class ObstacleHandler
 	public Set<NPC> getSwordNpcs()
 	{
 		return projectileTracker.getSwordNpcs();
+	}
+
+	/**
+	 * Discards learned sword holds. Deliberately not part of {@link #reset()}: that runs on every
+	 * scene reload, including loading lines mid-floor, which would throw away a measurement
+	 * before any later sword could use it. Holds are only stale once the instance itself is gone.
+	 */
+	public void resetThrownSwordHolds()
+	{
+		projectileTracker.getThrownSwordTracker().reset();
+		swordStatueTimings.reset();
+	}
+
+	public java.util.Map<WorldPoint, Integer> getThrowCountdowns()
+	{
+		return projectileTracker.getThrownSwordTracker().getThrowCountdowns();
+	}
+
+	public int getTicksUntilSwordReturns(NPC sword)
+	{
+		return projectileTracker.getThrownSwordTracker().getTicksUntilReturn(sword);
 	}
 
 	public Set<WorldPoint> getActiveYellowPortals()
@@ -481,7 +515,7 @@ public class ObstacleHandler
 				}
 			}
 
-			swordStatues.add(new SwordStatue(gameObject));
+			swordStatues.add(new SwordStatue(gameObject, swordStatueTimings));
 			return;
 		}
 
